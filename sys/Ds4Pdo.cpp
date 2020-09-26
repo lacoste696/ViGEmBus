@@ -175,7 +175,7 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoPrepareHardware()
 
 NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 {
-	NTSTATUS            status;
+	NTSTATUS status;
 
 	// Initialize periodic timer
 	WDF_TIMER_CONFIG timerConfig;
@@ -201,15 +201,17 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 	if (!NT_SUCCESS(status))
 	{
 		TraceEvents(TRACE_LEVEL_ERROR,
-			TRACE_DS4,
-			"WdfTimerCreate failed with status %!STATUS!",
-			status);
+		            TRACE_DS4,
+		            "WdfTimerCreate failed with status %!STATUS!",
+		            status);
 		return status;
 	}
 
 	// Load/generate MAC address
 
+	// 
 	// TODO: tidy up this region
+	// 
 
 	WDFKEY keyParams, keyTargets, keyDS, keySerial;
 	UNICODE_STRING keyName, valueName;
@@ -223,9 +225,9 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 	if (!NT_SUCCESS(status))
 	{
 		TraceEvents(TRACE_LEVEL_ERROR,
-			TRACE_DS4,
-			"WdfDriverOpenParametersRegistryKey failed with status %!STATUS!",
-			status);
+		            TRACE_DS4,
+		            "WdfDriverOpenParametersRegistryKey failed with status %!STATUS!",
+		            status);
 		return status;
 	}
 
@@ -236,16 +238,16 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 		&keyName,
 		KEY_ALL_ACCESS,
 		REG_OPTION_NON_VOLATILE,
-		NULL,
+		nullptr,
 		WDF_NO_OBJECT_ATTRIBUTES,
 		&keyTargets
 	);
 	if (!NT_SUCCESS(status))
 	{
 		TraceEvents(TRACE_LEVEL_ERROR,
-			TRACE_DS4,
-			"WdfRegistryCreateKey failed with status %!STATUS!",
-			status);
+		            TRACE_DS4,
+		            "WdfRegistryCreateKey failed with status %!STATUS!",
+		            status);
 		return status;
 	}
 
@@ -256,16 +258,16 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 		&keyName,
 		KEY_ALL_ACCESS,
 		REG_OPTION_NON_VOLATILE,
-		NULL,
+		nullptr,
 		WDF_NO_OBJECT_ATTRIBUTES,
 		&keyDS
 	);
 	if (!NT_SUCCESS(status))
 	{
 		TraceEvents(TRACE_LEVEL_ERROR,
-			TRACE_DS4,
-			"WdfRegistryCreateKey failed with status %!STATUS!",
-			status);
+		            TRACE_DS4,
+		            "WdfRegistryCreateKey failed with status %!STATUS!",
+		            status);
 		return status;
 	}
 
@@ -277,16 +279,16 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 		&serialPath,
 		KEY_ALL_ACCESS,
 		REG_OPTION_NON_VOLATILE,
-		NULL,
+		nullptr,
 		WDF_NO_OBJECT_ATTRIBUTES,
 		&keySerial
 	);
 	if (!NT_SUCCESS(status))
 	{
 		TraceEvents(TRACE_LEVEL_ERROR,
-			TRACE_DS4,
-			"WdfRegistryCreateKey failed with status %!STATUS!",
-			status);
+		            TRACE_DS4,
+		            "WdfRegistryCreateKey failed with status %!STATUS!",
+		            status);
 		return status;
 	}
 
@@ -297,19 +299,19 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 		&valueName,
 		sizeof(MAC_ADDRESS),
 		&this->_TargetMacAddress,
-		NULL,
-		NULL
+		nullptr,
+		nullptr
 	);
 
 	TraceEvents(TRACE_LEVEL_INFORMATION,
-		TRACE_DS4,
-		"MAC-Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-		this->_TargetMacAddress.Vendor0,
-		this->_TargetMacAddress.Vendor1,
-		this->_TargetMacAddress.Vendor2,
-		this->_TargetMacAddress.Nic0,
-		this->_TargetMacAddress.Nic1,
-		this->_TargetMacAddress.Nic2);
+	            TRACE_DS4,
+	            "MAC-Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
+	            this->_TargetMacAddress.Vendor0,
+	            this->_TargetMacAddress.Vendor1,
+	            this->_TargetMacAddress.Vendor2,
+	            this->_TargetMacAddress.Nic0,
+	            this->_TargetMacAddress.Nic1,
+	            this->_TargetMacAddress.Nic2);
 
 	if (status == STATUS_OBJECT_NAME_NOT_FOUND)
 	{
@@ -325,18 +327,18 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::PdoInitContext()
 		if (!NT_SUCCESS(status))
 		{
 			TraceEvents(TRACE_LEVEL_ERROR,
-				TRACE_DS4,
-				"WdfRegistryAssignValue failed with status %!STATUS!",
-				status);
+			            TRACE_DS4,
+			            "WdfRegistryAssignValue failed with status %!STATUS!",
+			            status);
 			return status;
 		}
 	}
 	else if (!NT_SUCCESS(status))
 	{
 		TraceEvents(TRACE_LEVEL_ERROR,
-			TRACE_DS4,
-			"WdfRegistryQueryValue failed with status %!STATUS!",
-			status);
+		            TRACE_DS4,
+		            "WdfRegistryQueryValue failed with status %!STATUS!",
+		            status);
 		return status;
 	}
 
@@ -426,41 +428,41 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::SelectConfiguration(PURB Urb)
 	if (Urb->UrbHeader.Length < DS4_CONFIGURATION_SIZE)
 	{
 		TraceEvents(TRACE_LEVEL_WARNING,
-			TRACE_USBPDO,
-			">> >> >> URB_FUNCTION_SELECT_CONFIGURATION: Invalid ConfigurationDescriptor");
+		            TRACE_USBPDO,
+		            ">> >> >> URB_FUNCTION_SELECT_CONFIGURATION: Invalid ConfigurationDescriptor");
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	PUSBD_INTERFACE_INFORMATION pInfo = &Urb->UrbSelectConfiguration.Interface;
 
 	TraceEvents(TRACE_LEVEL_VERBOSE,
-		TRACE_DS4,
-		">> >> >> URB_FUNCTION_SELECT_CONFIGURATION: Length %d, Interface %d, Alternate %d, Pipes %d",
-		(int)pInfo->Length,
-		(int)pInfo->InterfaceNumber,
-		(int)pInfo->AlternateSetting,
-		pInfo->NumberOfPipes);
+	            TRACE_DS4,
+	            ">> >> >> URB_FUNCTION_SELECT_CONFIGURATION: Length %d, Interface %d, Alternate %d, Pipes %d",
+	            static_cast<int>(pInfo->Length),
+	            static_cast<int>(pInfo->InterfaceNumber),
+	            static_cast<int>(pInfo->AlternateSetting),
+	            pInfo->NumberOfPipes);
 
 	pInfo->Class = 0x03; // HID
 	pInfo->SubClass = 0x00;
 	pInfo->Protocol = 0x00;
 
-	pInfo->InterfaceHandle = (USBD_INTERFACE_HANDLE)0xFFFF0000;
+	pInfo->InterfaceHandle = reinterpret_cast<USBD_INTERFACE_HANDLE>(0xFFFF0000);
 
 	pInfo->Pipes[0].MaximumTransferSize = 0x00400000;
 	pInfo->Pipes[0].MaximumPacketSize = 0x40;
 	pInfo->Pipes[0].EndpointAddress = 0x84;
 	pInfo->Pipes[0].Interval = 0x05;
-	pInfo->Pipes[0].PipeType = (USBD_PIPE_TYPE)0x03;
-	pInfo->Pipes[0].PipeHandle = (USBD_PIPE_HANDLE)0xFFFF0084;
+	pInfo->Pipes[0].PipeType = static_cast<USBD_PIPE_TYPE>(0x03);
+	pInfo->Pipes[0].PipeHandle = reinterpret_cast<USBD_PIPE_HANDLE>(0xFFFF0084);
 	pInfo->Pipes[0].PipeFlags = 0x00;
 
 	pInfo->Pipes[1].MaximumTransferSize = 0x00400000;
 	pInfo->Pipes[1].MaximumPacketSize = 0x40;
 	pInfo->Pipes[1].EndpointAddress = 0x03;
 	pInfo->Pipes[1].Interval = 0x05;
-	pInfo->Pipes[1].PipeType = (USBD_PIPE_TYPE)0x03;
-	pInfo->Pipes[1].PipeHandle = (USBD_PIPE_HANDLE)0xFFFF0003;
+	pInfo->Pipes[1].PipeType = static_cast<USBD_PIPE_TYPE>(0x03);
+	pInfo->Pipes[1].PipeHandle = reinterpret_cast<USBD_PIPE_HANDLE>(0xFFFF0003);
 	pInfo->Pipes[1].PipeFlags = 0x00;
 
 	return STATUS_SUCCESS;
@@ -1086,8 +1088,13 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::UsbControlTransfer(PURB Urb)
 
 NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::SubmitReportImpl(PVOID NewReport)
 {
-	NTSTATUS    status;
-	WDFREQUEST  usbRequest;
+	NTSTATUS				status;
+	WDFREQUEST				usbRequest;
+	
+	/*
+	 * The logic here is unusual to keep backwards compatibility with the 
+	 * original API that didn't allow submitting the full report.
+	 */
 
 	status = WdfIoQueueRetrieveNextRequest(this->_PendingUsbInRequests, &usbRequest);
 
@@ -1098,19 +1105,52 @@ NTSTATUS ViGEm::Bus::Targets::EmulationTargetDS4::SubmitReportImpl(PVOID NewRepo
 	PIRP pendingIrp = WdfRequestWdmGetIrp(usbRequest);
 
 	// Get USB request block
-	PURB urb = static_cast<PURB>(URB_FROM_IRP(pendingIrp));
+	const auto urb = static_cast<PURB>(URB_FROM_IRP(pendingIrp));
 
 	// Get transfer buffer
-	auto Buffer = static_cast<PUCHAR>(urb->UrbBulkOrInterruptTransfer.TransferBuffer);
+	const auto buffer = static_cast<PUCHAR>(urb->UrbBulkOrInterruptTransfer.TransferBuffer);
 
+	// Set correct buffer size
 	urb->UrbBulkOrInterruptTransfer.TransferBufferLength = DS4_REPORT_SIZE;
 
-	/* Copy report to cache and transfer buffer
-	 * Skip first byte as it contains the never changing report id */
-	RtlCopyBytes(this->_Report + 1, &(static_cast<PDS4_SUBMIT_REPORT>(NewReport))->Report, sizeof(DS4_REPORT));
+	// Cast to expected struct
+	const auto pSubmit = static_cast<PDS4_SUBMIT_REPORT>(NewReport);
 
-	if (Buffer)
-		RtlCopyBytes(Buffer, this->_Report, DS4_REPORT_SIZE);
+	/*
+	 * Copy report to cache and transfer buffer
+	 * Skip first byte as it contains the never changing report ID
+	 */
+
+	//
+	// "Old" API which only allows to update partial report
+	// 
+	if (pSubmit->Size == sizeof(DS4_SUBMIT_REPORT))
+	{
+		TraceDbg(TRACE_DS4, "Received DS4_SUBMIT_REPORT update");
+		
+		RtlCopyBytes(
+			&this->_Report[1],
+			&(static_cast<PDS4_SUBMIT_REPORT>(NewReport))->Report,
+			sizeof((static_cast<PDS4_SUBMIT_REPORT>(NewReport))->Report)
+		);
+	}
+
+	//
+	// "Extended" API allowing complete report update
+	// 
+	if (pSubmit->Size == sizeof(DS4_SUBMIT_REPORT_EX))
+	{
+		TraceDbg(TRACE_DS4, "Received DS4_SUBMIT_REPORT_EX update");
+		
+		RtlCopyBytes(
+			&this->_Report[1],
+			&(static_cast<PDS4_SUBMIT_REPORT_EX>(NewReport))->Report,
+			sizeof((static_cast<PDS4_SUBMIT_REPORT_EX>(NewReport))->Report)
+		);
+	}
+	
+	if (buffer)
+		RtlCopyBytes(buffer, this->_Report, DS4_REPORT_SIZE);
 
 	// Complete pending request
 	WdfRequestComplete(usbRequest, status);
@@ -1157,38 +1197,39 @@ VOID ViGEm::Bus::Targets::EmulationTargetDS4::PendingUsbRequestsTimerFunc(
 	_In_ WDFTIMER Timer
 )
 {
-	auto ctx = reinterpret_cast<EmulationTargetDS4*>(Core::EmulationTargetPdoGetContext(WdfTimerGetParentObject(Timer))->Target);
+	const auto ctx = reinterpret_cast<EmulationTargetDS4*>(Core::EmulationTargetPdoGetContext(
+		WdfTimerGetParentObject(Timer))->Target);
 
-	WDFREQUEST              usbRequest;
-	PIRP                    pendingIrp;
-	PIO_STACK_LOCATION      irpStack;
+	WDFREQUEST usbRequest;
 
-	TraceEvents(TRACE_LEVEL_VERBOSE, TRACE_DS4, "%!FUNC! Entry");
+	TraceDbg(TRACE_DS4, "%!FUNC! Entry");
 
 	// Get pending USB request
-	NTSTATUS status = WdfIoQueueRetrieveNextRequest(ctx->_PendingUsbInRequests, &usbRequest);
+	const auto status = WdfIoQueueRetrieveNextRequest(ctx->_PendingUsbInRequests, &usbRequest);
 
 	if (NT_SUCCESS(status))
 	{
 		// Get pending IRP
-		pendingIrp = WdfRequestWdmGetIrp(usbRequest);
-		irpStack = IoGetCurrentIrpStackLocation(pendingIrp);
+		const auto pendingIrp = WdfRequestWdmGetIrp(usbRequest);
+
+		const auto irpStack = IoGetCurrentIrpStackLocation(pendingIrp);
 
 		// Get USB request block
-		PURB urb = (PURB)irpStack->Parameters.Others.Argument1;
+		const auto urb = static_cast<PURB>(irpStack->Parameters.Others.Argument1);
 
 		// Get transfer buffer
-		PUCHAR Buffer = (PUCHAR)urb->UrbBulkOrInterruptTransfer.TransferBuffer;
+		const auto buffer = static_cast<PUCHAR>(urb->UrbBulkOrInterruptTransfer.TransferBuffer);
+
 		// Set buffer length to report size
 		urb->UrbBulkOrInterruptTransfer.TransferBufferLength = DS4_REPORT_SIZE;
 
 		// Copy cached report to transfer buffer 
-		if (Buffer)
-			RtlCopyBytes(Buffer, ctx->_Report, DS4_REPORT_SIZE);
+		if (buffer)
+			RtlCopyBytes(buffer, ctx->_Report, DS4_REPORT_SIZE);
 
 		// Complete pending request
 		WdfRequestComplete(usbRequest, status);
 	}
 
-	TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DS4, "%!FUNC! Exit with status %!STATUS!", status);
+	TraceDbg(TRACE_DS4, "%!FUNC! Exit with status %!STATUS!", status);
 }

@@ -62,24 +62,31 @@ namespace ViGEm::Bus::Core
 		EmulationTargetPDO(ULONG Serial, LONG SessionId, USHORT VendorId, USHORT ProductId);
 
 		virtual ~EmulationTargetPDO() = default;
-		
+
 		static bool GetPdoByTypeAndSerial(
 			IN WDFDEVICE ParentDevice,
 			IN VIGEM_TARGET_TYPE Type,
-			IN ULONG SerialNo, 
+			IN ULONG SerialNo,
 			OUT EmulationTargetPDO** Object
 		);
 
+		static NTSTATUS EnqueueWaitDeviceReady(
+			WDFDEVICE ParentDevice,
+			ULONG SerialNo,
+			WDFREQUEST Request);
+
+		static EVT_WDF_CHILD_LIST_IDENTIFICATION_DESCRIPTION_COMPARE EvtChildListIdentificationDescriptionCompare;
+
 		virtual NTSTATUS PdoPrepareDevice(PWDFDEVICE_INIT DeviceInit,
-		                                  PUNICODE_STRING DeviceId,
-		                                  PUNICODE_STRING DeviceDescription) = 0;
+			PUNICODE_STRING DeviceId,
+			PUNICODE_STRING DeviceDescription) = 0;
 
 		virtual NTSTATUS PdoPrepareHardware() = 0;
 
 		virtual NTSTATUS PdoInitContext() = 0;
 
 		NTSTATUS PdoCreateDevice(_In_ WDFDEVICE ParentDevice,
-		                         _In_ PWDFDEVICE_INIT DeviceInit);
+			_In_ PWDFDEVICE_INIT DeviceInit);
 
 		bool operator==(EmulationTargetPDO& other) const
 		{
@@ -103,7 +110,7 @@ namespace ViGEm::Bus::Core
 		virtual NTSTATUS UsbGetStringDescriptorType(PURB Urb) = 0;
 
 		virtual NTSTATUS UsbBulkOrInterruptTransfer(struct _URB_BULK_OR_INTERRUPT_TRANSFER* pTransfer,
-		                                            WDFREQUEST Request) = 0;
+			WDFREQUEST Request) = 0;
 
 		virtual NTSTATUS UsbControlTransfer(PURB Urb) = 0;
 
@@ -115,10 +122,8 @@ namespace ViGEm::Bus::Core
 
 		VIGEM_TARGET_TYPE GetType() const;
 
-		NTSTATUS EnqueuePlugin(WDFREQUEST Request);
-
 		NTSTATUS PdoPrepare(WDFDEVICE ParentDevice);
-	
+
 	private:
 		static unsigned long current_process_id();
 
@@ -130,13 +135,15 @@ namespace ViGEm::Bus::Core
 			OUT EmulationTargetPDO** Object
 		);
 
-		HANDLE _PluginRequestCompletionWorkerThreadHandle{};
+		NTSTATUS EnqueueWaitDeviceReady(WDFREQUEST Request);
 		
+		HANDLE _WaitDeviceReadyCompletionWorkerThreadHandle{};
+
 	protected:
 		static const ULONG _maxHardwareIdLength = 0xFF;
 
 		static const int MAX_INSTANCE_ID_LEN = 80;
-		
+
 		static PCWSTR _deviceLocation;
 
 		static BOOLEAN USB_BUSIFFN UsbInterfaceIsDeviceHighSpeed(IN PVOID BusContext);
@@ -163,8 +170,8 @@ namespace ViGEm::Bus::Core
 
 		static EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL EvtIoInternalDeviceControl;
 
-		static VOID PluginRequestCompletionWorkerRoutine(IN PVOID StartContext);
-		
+		static VOID WaitDeviceReadyCompletionWorkerRoutine(IN PVOID StartContext);
+
 		virtual VOID GetConfigurationDescriptorType(PUCHAR Buffer, ULONG Length) = 0;
 
 		virtual NTSTATUS SelectConfiguration(PURB Urb) = 0;
@@ -184,7 +191,7 @@ namespace ViGEm::Bus::Core
 		// Power Capabilities may differ from device to device
 		// 
 		WDF_DEVICE_POWER_CAPABILITIES _PowerCapabilities;
-		
+
 		//
 		// Unique serial number of the device on the bus
 		// 
@@ -218,8 +225,8 @@ namespace ViGEm::Bus::Core
 		//
 		// Queue for blocking plugin requests
 		// 
-		WDFQUEUE _PendingPlugInRequests{};
-		
+		WDFQUEUE _WaitDeviceReadyRequests{};
+
 		//
 		// Queue for incoming data interrupt transfer
 		//
@@ -234,7 +241,7 @@ namespace ViGEm::Bus::Core
 		// This child objects' device object
 		// 
 		WDFDEVICE _PdoDevice{};
-		
+
 		//
 		// Configuration descriptor size (populated by derived class)
 		// 
@@ -267,12 +274,12 @@ namespace ViGEm::Bus::Core
 		// Context object of PDO
 		// 
 		EmulationTargetPDO* Target;
-	} PDO_IDENTIFICATION_DESCRIPTION, *PPDO_IDENTIFICATION_DESCRIPTION;
+	} PDO_IDENTIFICATION_DESCRIPTION, * PPDO_IDENTIFICATION_DESCRIPTION;
 
 	typedef struct _EMULATION_TARGET_PDO_CONTEXT
 	{
 		EmulationTargetPDO* Target;
-	} EMULATION_TARGET_PDO_CONTEXT, *PEMULATION_TARGET_PDO_CONTEXT;
+	} EMULATION_TARGET_PDO_CONTEXT, * PEMULATION_TARGET_PDO_CONTEXT;
 
 	WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(EMULATION_TARGET_PDO_CONTEXT, EmulationTargetPdoGetContext)
 }

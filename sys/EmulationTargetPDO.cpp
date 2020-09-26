@@ -321,16 +321,16 @@ VOID ViGEm::Bus::Core::EmulationTargetPDO::EvtDeviceContextCleanup(
 	//
 	// This queues parent is the FDO so explicitly free memory
 	//
-	WdfIoQueuePurgeSynchronously(ctx->Target->_PendingPlugInRequests);
-	WdfObjectDelete(ctx->Target->_PendingPlugInRequests);
+	WdfIoQueuePurgeSynchronously(ctx->Target->_WaitDeviceReadyRequests);
+	WdfObjectDelete(ctx->Target->_WaitDeviceReadyRequests);
 
 	//
 	// Wait for thread to finish, if active
 	// 
-	if (ctx->Target->_PluginRequestCompletionWorkerThreadHandle)
+	if (ctx->Target->_WaitDeviceReadyCompletionWorkerThreadHandle)
 	{
 		NTSTATUS status = KeWaitForSingleObject(
-			&ctx->Target->_PluginRequestCompletionWorkerThreadHandle,
+			&ctx->Target->_WaitDeviceReadyCompletionWorkerThreadHandle,
 			Executive,
 			KernelMode,
 			FALSE,
@@ -339,8 +339,8 @@ VOID ViGEm::Bus::Core::EmulationTargetPDO::EvtDeviceContextCleanup(
 
 		if (NT_SUCCESS(status))
 		{
-			ZwClose(ctx->Target->_PluginRequestCompletionWorkerThreadHandle);
-			ctx->Target->_PluginRequestCompletionWorkerThreadHandle = nullptr;
+			ZwClose(ctx->Target->_WaitDeviceReadyCompletionWorkerThreadHandle);
+			ctx->Target->_WaitDeviceReadyCompletionWorkerThreadHandle = nullptr;
 		}
 		else
 		{
@@ -384,20 +384,20 @@ VIGEM_TARGET_TYPE ViGEm::Bus::Core::EmulationTargetPDO::GetType() const
 	return this->_TargetType;
 }
 
-NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EnqueuePlugin(WDFREQUEST Request)
+NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EnqueueWaitDeviceReady(WDFREQUEST Request)
 {
 	NTSTATUS status;
 
 	if (!this->IsOwnerProcess())
 		return STATUS_ACCESS_DENIED;
 
-	if (!this->_PendingPlugInRequests)
+	if (!this->_WaitDeviceReadyRequests)
 		return STATUS_INVALID_DEVICE_STATE;
 
-	if (this->_PluginRequestCompletionWorkerThreadHandle)
+	if (this->_WaitDeviceReadyCompletionWorkerThreadHandle)
 	{
 		status = KeWaitForSingleObject(
-			&this->_PluginRequestCompletionWorkerThreadHandle,
+			&this->_WaitDeviceReadyCompletionWorkerThreadHandle,
 			Executive,
 			KernelMode,
 			FALSE,
@@ -406,8 +406,8 @@ NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EnqueuePlugin(WDFREQUEST Request)
 
 		if (NT_SUCCESS(status))
 		{
-			ZwClose(this->_PluginRequestCompletionWorkerThreadHandle);
-			this->_PluginRequestCompletionWorkerThreadHandle = nullptr;
+			ZwClose(this->_WaitDeviceReadyCompletionWorkerThreadHandle);
+			this->_WaitDeviceReadyCompletionWorkerThreadHandle = nullptr;
 		}
 		else
 		{
@@ -419,7 +419,7 @@ NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EnqueuePlugin(WDFREQUEST Request)
 		}
 	}
 	
-	status = WdfRequestForwardToIoQueue(Request, this->_PendingPlugInRequests);
+	status = WdfRequestForwardToIoQueue(Request, this->_WaitDeviceReadyRequests);
 
 	if (!NT_SUCCESS(status))
 	{
@@ -437,12 +437,12 @@ NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EnqueuePlugin(WDFREQUEST Request)
 	InitializeObjectAttributes(&threadOb, NULL,
 	                           OBJ_KERNEL_HANDLE, NULL, NULL);
 
-	status = PsCreateSystemThread(&this->_PluginRequestCompletionWorkerThreadHandle,
+	status = PsCreateSystemThread(&this->_WaitDeviceReadyCompletionWorkerThreadHandle,
 	                              static_cast<ACCESS_MASK>(0L),
 	                              &threadOb,
 	                              nullptr,
 	                              nullptr,
-	                              PluginRequestCompletionWorkerRoutine,
+	                              WaitDeviceReadyCompletionWorkerRoutine,
 	                              this
 	);
 
@@ -474,7 +474,7 @@ NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::PdoPrepare(WDFDEVICE ParentDevice
 		ParentDevice,
 		&plugInQueueConfig,
 		WDF_NO_OBJECT_ATTRIBUTES,
-		&this->_PendingPlugInRequests
+		&this->_WaitDeviceReadyRequests
 	);
 	if (!NT_SUCCESS(status))
 	{
@@ -555,11 +555,11 @@ VOID USB_BUSIFFN ViGEm::Bus::Core::EmulationTargetPDO::UsbInterfaceGetUSBDIVersi
 
 #pragma endregion
 
-VOID ViGEm::Bus::Core::EmulationTargetPDO::PluginRequestCompletionWorkerRoutine(IN PVOID StartContext)
+VOID ViGEm::Bus::Core::EmulationTargetPDO::WaitDeviceReadyCompletionWorkerRoutine(IN PVOID StartContext)
 {
 	const auto ctx = static_cast<EmulationTargetPDO*>(StartContext);
 
-	WDFREQUEST pluginRequest;
+	WDFREQUEST waitRequest;
 	LARGE_INTEGER timeout;
 	timeout.QuadPart = WDF_REL_TIMEOUT_IN_SEC(1);
 
@@ -581,11 +581,11 @@ VOID ViGEm::Bus::Core::EmulationTargetPDO::PluginRequestCompletionWorkerRoutine(
 		//
 		// Fetch pending request (there has to be one at this point)
 		// 
-		if (!NT_SUCCESS(WdfIoQueueRetrieveNextRequest(ctx->_PendingPlugInRequests, &pluginRequest)))
+		if (!NT_SUCCESS(WdfIoQueueRetrieveNextRequest(ctx->_WaitDeviceReadyRequests, &waitRequest)))
 		{
 			TraceEvents(TRACE_LEVEL_WARNING,
 			            TRACE_BUSPDO,
-			            "No pending plugin request available"
+			            "No pending device wait request available"
 			);
 			break;
 		}
@@ -594,13 +594,13 @@ VOID ViGEm::Bus::Core::EmulationTargetPDO::PluginRequestCompletionWorkerRoutine(
 		{
 			TraceEvents(TRACE_LEVEL_WARNING,
 			            TRACE_BUSPDO,
-			            "Plugin request timed out, completing with error"
+			            "Device wait request timed out, completing with error"
 			);
 
 			//
 			// We haven't hit a path where the event gets signaled, report error
 			// 
-			WdfRequestComplete(pluginRequest, STATUS_DEVICE_HARDWARE_ERROR);
+			WdfRequestComplete(waitRequest, STATUS_DEVICE_HARDWARE_ERROR);
 			break;
 		}
 
@@ -608,20 +608,20 @@ VOID ViGEm::Bus::Core::EmulationTargetPDO::PluginRequestCompletionWorkerRoutine(
 		{
 			TraceEvents(TRACE_LEVEL_INFORMATION,
 			            TRACE_BUSPDO,
-			            "Plugin request completed successfully"
+			            "Device wait request completed successfully"
 			);
 
 			//
 			// Event triggered in time, complete with success
 			// 
-			WdfRequestComplete(pluginRequest, STATUS_SUCCESS);
+			WdfRequestComplete(waitRequest, STATUS_SUCCESS);
 			break;
 		}
 	}
 	while (FALSE);
 
-	ZwClose(ctx->_PluginRequestCompletionWorkerThreadHandle);
-	ctx->_PluginRequestCompletionWorkerThreadHandle = nullptr;
+	ZwClose(ctx->_WaitDeviceReadyCompletionWorkerThreadHandle);
+	ctx->_WaitDeviceReadyCompletionWorkerThreadHandle = nullptr;
 	KeClearEvent(&ctx->_PdoBootNotificationEvent);
 	(void)PsTerminateSystemThread(0);
 }
@@ -759,6 +759,89 @@ bool ViGEm::Bus::Core::EmulationTargetPDO::GetPdoByTypeAndSerial(IN WDFDEVICE Pa
 	IN ULONG SerialNo, OUT EmulationTargetPDO** Object)
 {
 	return (GetPdoBySerial(ParentDevice, SerialNo, Object) && (*Object)->GetType() == Type);
+}
+
+BOOLEAN ViGEm::Bus::Core::EmulationTargetPDO::EvtChildListIdentificationDescriptionCompare(
+	WDFCHILDLIST DeviceList,
+	PWDF_CHILD_IDENTIFICATION_DESCRIPTION_HEADER FirstIdentificationDescription,
+	PWDF_CHILD_IDENTIFICATION_DESCRIPTION_HEADER SecondIdentificationDescription)
+{
+	ViGEm::Bus::Core::PPDO_IDENTIFICATION_DESCRIPTION lhs, rhs;
+
+	UNREFERENCED_PARAMETER(DeviceList);
+
+	lhs = CONTAINING_RECORD(FirstIdentificationDescription,
+		ViGEm::Bus::Core::PDO_IDENTIFICATION_DESCRIPTION,
+		Header);
+	rhs = CONTAINING_RECORD(SecondIdentificationDescription,
+		ViGEm::Bus::Core::PDO_IDENTIFICATION_DESCRIPTION,
+		Header);
+
+	return (lhs->SerialNo == rhs->SerialNo) ? TRUE : FALSE;
+}
+
+
+NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EnqueueWaitDeviceReady(WDFDEVICE ParentDevice, ULONG SerialNo,
+                                                                      WDFREQUEST Request)
+{
+	NTSTATUS status;
+	PDO_IDENTIFICATION_DESCRIPTION description;
+	WDF_CHILD_LIST_ITERATOR iterator;
+	WDF_CHILD_RETRIEVE_INFO childInfo;
+	WDFDEVICE childDevice;
+
+	TraceDbg(TRACE_BUSPDO, "%!FUNC! Entry");
+	
+	const WDFCHILDLIST list = WdfFdoGetDefaultChildList(ParentDevice);
+
+	WDF_CHILD_LIST_ITERATOR_INIT(
+		&iterator,
+		WdfRetrievePendingChildren // might not be online yet
+	);
+	WdfChildListBeginIteration(
+		list,
+		&iterator
+	);
+
+	WDF_CHILD_RETRIEVE_INFO_INIT(
+		&childInfo,
+		&description.Header
+	);
+
+	//
+	// Compare to find explicit PDO asked for (by serial)
+	// 
+	childInfo.EvtChildListIdentificationDescriptionCompare = EvtChildListIdentificationDescriptionCompare;
+
+	WDF_CHILD_IDENTIFICATION_DESCRIPTION_HEADER_INIT(
+		&description.Header,
+		sizeof(description)
+	);
+
+	description.SerialNo = SerialNo;
+
+	status = WdfChildListRetrieveNextDevice(
+		list,
+		&iterator,
+		&childDevice, // is NULL due to WdfRetrievePendingChildren
+		&childInfo
+	);
+	if (NT_SUCCESS(status))
+	{
+		//
+		// Object pointer filled after successful retrieval
+		// 
+		status = description.Target->EnqueueWaitDeviceReady(Request);
+	}
+
+	WdfChildListEndIteration(
+		list,
+		&iterator
+	);
+
+	TraceDbg(TRACE_BUSPDO, "%!FUNC! Exit with status %!STATUS!", status);
+	
+	return status;
 }
 
 NTSTATUS ViGEm::Bus::Core::EmulationTargetPDO::EvtDevicePrepareHardware(
